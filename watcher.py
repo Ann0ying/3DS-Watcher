@@ -1,12 +1,13 @@
-"""3DS GitHub watcher: finds recently updated Nintendo 3DS repos, summarizes changes with Claude, notifies via Telegram."""
+"""3DS GitHub watcher: finds recently updated Nintendo 3DS repos, summarizes changes with Google Gemini (free tier), notifies via Telegram."""
 import os
 import re
 import json
 import html
 from datetime import datetime, timedelta, timezone
 
+import time
+
 import requests
-from anthropic import Anthropic
 
 # ------------------------------------------------------------------
 # SETTINGS YOU CAN EDIT
@@ -24,14 +25,14 @@ SEARCH_TERMS = [
     "citra in:name,description",
     "new3ds in:name,description",
 ]
-MODEL = "claude-haiku-5-5"   # cheap and fast; fine for summaries
+MODEL = "gemini-3.5-flash-lite"   # lightweight model with a more generous free tier
 STATE_FILE = "state.json"
 # ------------------------------------------------------------------
 
 GH_TOKEN = os.environ["GH_TOKEN"]
 TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TG_CHAT = os.environ.get("TELEGRAM_CHAT_ID")
-client = Anthropic()  # reads ANTHROPIC_API_KEY automatically
+GEMINI_KEY = os.environ["GEMINI_API_KEY"]
 
 GH_HEADERS = {
     "Authorization": f"Bearer {GH_TOKEN}",
@@ -94,14 +95,22 @@ def get_changes(full_name, since):
     return messages, new_releases
 
 
-def ask_claude(prompt):
-    msg = client.messages.create(
-        model=MODEL, max_tokens=600,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    text = msg.content[0].text
-    match = re.search(r"\{.*\}", text, re.S)
-    return json.loads(match.group(0))
+def ask_ai(prompt):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.2},
+    }
+    for attempt in range(3):
+        r = requests.post(url, headers={"x-goog-api-key": GEMINI_KEY}, json=body, timeout=60)
+        if r.status_code == 429:  # free-tier rate limit: wait and retry
+            time.sleep(20 * (attempt + 1))
+            continue
+        r.raise_for_status()
+        text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+        match = re.search(r"\{.*\}", text, re.S)
+        return json.loads(match.group(0))
+    raise RuntimeError("Gemini rate limit hit")
 
 
 def analyze(item, known, messages, new_releases):
@@ -135,7 +144,7 @@ New releases:
 
 Reply with ONLY a JSON object:
 {{"relevant": true/false, "what_it_is": "1-2 sentence description of the project", "what_changed": "1-2 sentence plain-language summary of the recent changes", "release_summary": "short summary of release notes, or empty string if no release"}}"""
-    return ask_claude(prompt)
+    return ask_ai(prompt)
 
 
 def send(text):
