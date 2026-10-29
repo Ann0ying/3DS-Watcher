@@ -142,6 +142,8 @@ Commits in the last few hours:
 New releases:
 {release_text}
 
+Write the text values of "what_it_is", "what_changed" and "release_summary" in Ukrainian. Keep project names, file names, version numbers and technical terms (e.g. homebrew, CFW, CIA, 3DSX) in their original form.
+
 Reply with ONLY a JSON object:
 {{"relevant": true/false, "what_it_is": "1-2 sentence description of the project", "what_changed": "1-2 sentence plain-language summary of the recent changes", "release_summary": "short summary of release notes, or empty string if no release"}}"""
     return ask_ai(prompt)
@@ -188,6 +190,8 @@ def main():
                 "relevant": bool(result.get("relevant")),
                 "description": result.get("what_it_is", ""),
             }
+        elif result.get("what_it_is"):
+            known["description"] = result["what_it_is"]  # refresh (and translate) stored description
         if not result.get("relevant"):
             continue
 
@@ -196,10 +200,10 @@ def main():
             f"🎮 <b>{e(full_name)}</b>",
             e(state["repos"][full_name]["description"]),
             "",
-            f"<b>Changes:</b> {e(result.get('what_changed', ''))}",
+            f"<b>Зміни:</b> {e(result.get('what_changed', ''))}",
         ]
         for r in new_releases:
-            lines.append(f"\n🚀 <b>New release {e(r['tag_name'])}</b>: {e(result.get('release_summary', ''))}")
+            lines.append(f"\n🚀 <b>Нова версія {e(r['tag_name'])}</b>: {e(result.get('release_summary', ''))}")
             lines.append(r["html_url"])
         lines.append(f"\n{item['html_url']}")
         send("\n".join(lines))
