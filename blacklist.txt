@@ -1,0 +1,9 @@
+# Repos listed here will never be posted.
+# One entry per line. Lines starting with # are ignored.
+#
+# Block a single repo:      owner/repo-name
+# Block everything from an account:   owner/*
+#
+# Examples (remove the # to activate):
+# someuser/some-repo
+# spamaccount/*
