@@ -7,3 +7,9 @@
 # Examples (remove the # to activate):
 # someuser/some-repo
 # spamaccount/*
+joshbirnholz/dual-screen
+melmen122/Uemulator
+Ann0ying/3DS-Watcher
+Universal-Team/db
+carlospjjj-oss/cartucho
+3dsbrowser/3dsbrowser.github.io
