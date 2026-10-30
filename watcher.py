@@ -27,6 +27,8 @@ SEARCH_TERMS = [
 ]
 MODEL = "gemini-3.5-flash-lite"   # lightweight model with a more generous free tier
 STATE_FILE = "state.json"
+BLACKLIST_FILE = "blacklist.txt"   # one repo (owner/repo) or whole account (owner/*) per line
+MAX_LOOKBACK_HOURS = 48   # if the watcher was off for a long time, never look back further than this
 # ------------------------------------------------------------------
 
 GH_TOKEN = os.environ["GH_TOKEN"]
@@ -68,23 +70,46 @@ def iso(d):
     return d.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def load_blacklist():
+    blocked = set()
+    if os.path.exists(BLACKLIST_FILE):
+        with open(BLACKLIST_FILE, encoding="utf-8") as f:
+            for line in f:
+                line = line.split("#", 1)[0].strip().lower()
+                if line:
+                    blocked.add(line)
+    return blocked
+
+
+def is_blocked(full_name, blocked):
+    name = full_name.lower()
+    owner = name.split("/")[0]
+    return name in blocked or owner in blocked or f"{owner}/*" in blocked
+
+
 def find_candidates(since):
     found = {}
     for term in SEARCH_TERMS:
         q = f"{term} pushed:>{iso(since)}"
-        try:
-            data = gh("/search/repositories", {"q": q, "sort": "updated", "per_page": 100})
-        except Exception as e:
-            print(f"Search failed for '{term}': {e}")
-            continue
-        for item in data.get("items", []):
-            found[item["full_name"]] = item
+        for page in range(1, 4):  # up to 300 results per search term
+            try:
+                data = gh("/search/repositories",
+                          {"q": q, "sort": "updated", "per_page": 100, "page": page})
+            except Exception as e:
+                print(f"Search failed for '{term}' (page {page}): {e}")
+                break
+            items = data.get("items", [])
+            for item in items:
+                found[item["full_name"]] = item
+            time.sleep(2)  # stay under GitHub's search rate limit
+            if len(items) < 100:
+                break
     print(f"Found {len(found)} candidate repos")
     return found
 
 
 def get_changes(full_name, since):
-    commits = gh(f"/repos/{full_name}/commits", {"since": iso(since), "per_page": 30}) or []
+    commits = gh(f"/repos/{full_name}/commits", {"since": iso(since), "per_page": 100}) or []
     messages = [c["commit"]["message"].split("\n")[0] for c in commits]
     releases = gh(f"/repos/{full_name}/releases", {"per_page": 5}) or []
     new_releases = [
@@ -128,7 +153,9 @@ def analyze(item, known, messages, new_releases):
         f"Release {r['tag_name']} ({r.get('name')}):\n{(r.get('body') or '')[:1500]}"
         for r in new_releases
     ) or "None"
-    commit_text = "\n".join(f"- {m}" for m in messages) or "None"
+    commit_text = "\n".join(f"- {m}" for m in messages[:40]) or "None"
+    if len(messages) > 40:
+        commit_text += f"\n...and {len(messages) - 40} more commits"
 
     prompt = f"""You monitor GitHub for projects related to the Nintendo 3DS console: homebrew apps, games, custom firmware, emulators, modding or hacking tools, ports, development libraries. Many such repos never write "Nintendo", so judge from the content.
 Note: "3ds" can also mean 3D Studio Max / .3ds model files or 3-D Secure payments. Those are NOT relevant unless the project is clearly for the Nintendo 3DS.
@@ -153,14 +180,16 @@ def send(text):
     if not (TG_TOKEN and TG_CHAT):
         print(text)
         return
-    r = requests.post(
-        f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-        json={"chat_id": TG_CHAT, "text": text[:4000], "parse_mode": "HTML",
-              "disable_web_page_preview": True},
-        timeout=30,
-    )
-    if not r.ok:
-        print("Telegram error:", r.text)
+    # TELEGRAM_CHAT_ID can hold several IDs separated by commas, e.g. 12345,67890
+    for chat_id in [c.strip() for c in TG_CHAT.split(",") if c.strip()]:
+        r = requests.post(
+            f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+            json={"chat_id": chat_id, "text": text[:4000], "parse_mode": "HTML",
+                  "disable_web_page_preview": True},
+            timeout=30,
+        )
+        if not r.ok:
+            print(f"Telegram error for {chat_id}:", r.text)
 
 
 def main():
@@ -168,10 +197,14 @@ def main():
     state = load_state()
     since = (datetime.fromisoformat(state["last_run"]) if state["last_run"]
              else now - timedelta(hours=6))
+    since = max(since, now - timedelta(hours=MAX_LOOKBACK_HOURS))
     print(f"Checking changes since {iso(since)}")
 
+    blocked = load_blacklist()
     notified = 0
     for full_name, item in find_candidates(since).items():
+        if is_blocked(full_name, blocked):
+            continue
         known = state["repos"].get(full_name)
         if known and not known["relevant"]:
             continue  # already judged not about the 3DS
