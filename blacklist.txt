@@ -15,3 +15,5 @@ carlospjjj-oss/cartucho
 3dsbrowser/3dsbrowser.github.io
 rommagic/Citra-Full-Version
 lavinggoose4/Citra
+sobrangatinaCpu/ciTrack
+sashkinbro/EmuCoreD
