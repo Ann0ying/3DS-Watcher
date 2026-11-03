@@ -17,3 +17,4 @@ rommagic/Citra-Full-Version
 lavinggoose4/Citra
 sobrangatinaCpu/ciTrack
 sashkinbro/EmuCoreD
+kirka-11/3dmoo-Full-Version
