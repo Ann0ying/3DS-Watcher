@@ -48,7 +48,7 @@ def gh(path, params=None, raw=False):
     if raw:
         headers["Accept"] = "application/vnd.github.raw+json"
     r = requests.get(f"https://api.github.com{path}", headers=headers, params=params, timeout=30)
-    if r.status_code == 404:
+    if r.status_code in (404, 409):  # 404 = not found, 409 = empty repository
         return None
     r.raise_for_status()
     return r.text if raw else r.json()
@@ -126,16 +126,22 @@ def ask_ai(prompt):
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"responseMimeType": "application/json", "temperature": 0.2},
     }
+    last_error = None
     for attempt in range(3):
         r = requests.post(url, headers={"x-goog-api-key": GEMINI_KEY}, json=body, timeout=60)
         if r.status_code == 429:  # free-tier rate limit: wait and retry
             time.sleep(20 * (attempt + 1))
+            last_error = "Gemini rate limit hit"
             continue
         r.raise_for_status()
-        text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        match = re.search(r"\{.*\}", text, re.S)
-        return json.loads(match.group(0))
-    raise RuntimeError("Gemini rate limit hit")
+        try:
+            text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            match = re.search(r"\{.*\}", text, re.S)
+            return json.loads(match.group(0))
+        except (ValueError, KeyError, IndexError, AttributeError) as e:
+            last_error = f"Bad AI response: {e}"  # malformed JSON: just ask again
+            time.sleep(2)
+    raise RuntimeError(last_error)
 
 
 def analyze(item, known, messages, new_releases):
