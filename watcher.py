@@ -111,7 +111,7 @@ def find_candidates(since):
 def get_changes(full_name, since):
     commits = gh(f"/repos/{full_name}/commits", {"since": iso(since), "per_page": 100}) or []
     messages = [c["commit"]["message"].split("\n")[0] for c in commits]
-    releases = gh(f"/repos/{full_name}/releases", {"per_page": 5}) or []
+    releases = gh(f"/repos/{full_name}/releases", {"per_page": 20}) or []
     new_releases = [
         r for r in releases
         if not r.get("draft") and r.get("published_at")
@@ -149,10 +149,18 @@ def analyze(item, known, messages, new_releases):
             f"Topics: {item.get('topics')}\n"
             f"README (truncated):\n{readme[:3000]}"
         )
-    release_text = "\n\n".join(
-        f"Release {r['tag_name']} ({r.get('name')}):\n{(r.get('body') or '')[:1500]}"
-        for r in new_releases
-    ) or "None"
+    seen_bodies, parts = set(), []
+    for r in new_releases:
+        body = (r.get("body") or "").strip()[:1500]
+        if body in seen_bodies:
+            continue  # identical release notes: include only once
+        seen_bodies.add(body)
+        parts.append(f"Release {r['tag_name']} ({r.get('name')}):\n{body}")
+        if len(parts) >= 5:
+            break
+    release_text = "\n\n".join(parts) or "None"
+    if len(new_releases) > 1:
+        release_text += f"\n\n({len(new_releases)} releases were published in total; summarize them together, once.)"
     commit_text = "\n".join(f"- {m}" for m in messages[:40]) or "None"
     if len(messages) > 40:
         commit_text += f"\n...and {len(messages) - 40} more commits"
@@ -168,6 +176,8 @@ Commits in the last few hours:
 
 New releases:
 {release_text}
+
+If several releases were published, write ONE combined "release_summary" for all of them; never repeat the same sentence per release. If release notes add nothing beyond the commit changes, keep "release_summary" very short.
 
 Write the text values of "what_it_is", "what_changed" and "release_summary" in Ukrainian. Keep project names, file names, version numbers and technical terms (e.g. homebrew, CFW, CIA, 3DSX) in their original form.
 
@@ -235,9 +245,18 @@ def main():
             "",
             f"<b>Зміни:</b> {e(result.get('what_changed', ''))}",
         ]
-        for r in new_releases:
-            lines.append(f"\n🚀 <b>Нова версія {e(r['tag_name'])}</b>: {e(result.get('release_summary', ''))}")
+        rel_summary = e(result.get("release_summary", ""))
+        if len(new_releases) == 1:
+            r = new_releases[0]
+            lines.append(f"\n🚀 <b>Нова версія {e(r['tag_name'])}</b>: {rel_summary}")
             lines.append(r["html_url"])
+        elif len(new_releases) > 1:
+            lines.append(f"\n🚀 <b>Нові версії ({len(new_releases)})</b>: {rel_summary}")
+            for r in new_releases[:10]:
+                url = html.escape(r["html_url"], quote=True)
+                lines.append(f'• <a href="{url}">{e(r["tag_name"])}</a>')
+            if len(new_releases) > 10:
+                lines.append(f"…і ще {len(new_releases) - 10}")
         lines.append(f"\n{item['html_url']}")
         send("\n".join(lines))
         notified += 1
