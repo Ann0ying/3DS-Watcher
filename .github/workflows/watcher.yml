@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:            # never run two copies at once
+  group: watcher
+  cancel-in-progress: false
+
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -32,4 +36,17 @@ jobs:
           git config user.name "watcher-bot"
           git config user.email "watcher-bot@users.noreply.github.com"
           git add state.json
-          git diff --staged --quiet || (git commit -m "Update state" && git push)
+          if git diff --staged --quiet; then
+            echo "Nothing to save"
+            exit 0
+          fi
+          git commit -m "Update state"
+          # If someone changed the repo while the watcher was running, merge and retry
+          for i in 1 2 3 4 5; do
+            if git pull --rebase -X theirs origin "${{ github.ref_name }}" && git push; then
+              exit 0
+            fi
+            echo "Push failed, retrying ($i/5)..."
+            sleep 5
+          done
+          exit 1
