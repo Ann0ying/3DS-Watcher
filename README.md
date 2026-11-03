@@ -67,6 +67,10 @@ The language is set by one instruction in the AI prompt in `watcher.py`: find th
 - The free Gemini tier has daily limits. This bot only calls the AI for repos that actually changed, so normal usage stays well within them.
 - Summaries are AI-generated and can occasionally be wrong. Always check the linked repo before downloading anything.
 
+## Vibe-coding disclosure
+
+This project is **purely vibe-coded**: it was written entirely with the help of an AI assistant, by someone who is not a programmer. The code hasn't been professionally reviewed or audited. It works for its author, but expect rough edges, and review the code yourself before relying on it or running it with your own keys. Issues and suggestions are welcome.
+
 ## Disclaimer
 
 This project only reports publicly available information from GitHub. It is not affiliated with Nintendo, GitHub, Google or Telegram. Nintendo 3DS is a trademark of Nintendo.
