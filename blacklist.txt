@@ -9,7 +9,7 @@
 # spamaccount/*
 joshbirnholz/dual-screen
 melmen122/Uemulator
-Ann0ying/3DS-Watcher
+Ann0ying/3DSnitch
 Universal-Team/db
 carlospjjj-oss/cartucho
 3dsbrowser/3dsbrowser.github.io
