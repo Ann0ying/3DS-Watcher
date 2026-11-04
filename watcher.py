@@ -3,6 +3,7 @@ import os
 import re
 import json
 import html
+from urllib.parse import quote
 from datetime import datetime, timedelta, timezone
 
 import time
@@ -27,6 +28,8 @@ SEARCH_TERMS = [
 ]
 MODEL = "gemini-3.5-flash-lite"   # lightweight model with a more generous free tier
 STATE_FILE = "state.json"
+QR_BUTTONS = True        # add "QR" buttons for releases that contain .cia files (for 3dsDL or FBI on the 3DS)
+MAX_QR_BUTTONS = 5
 BLACKLIST_FILE = "blacklist.txt"   # one repo (owner/repo) or whole account (owner/*) per line
 MAX_LOOKBACK_HOURS = 48   # if the watcher was off for a long time, never look back further than this
 # ------------------------------------------------------------------
@@ -192,18 +195,43 @@ Reply with ONLY a JSON object:
     return ask_ai(prompt)
 
 
-def send(text):
+def make_qr_buttons(new_releases):
+    """One button per .cia file in the new releases; opens a QR image of the direct download link."""
+    if not QR_BUTTONS:
+        return []
+    cia_assets = []
+    for r in new_releases:
+        for a in r.get("assets", []):
+            if a.get("name", "").lower().endswith(".cia") and a.get("state", "uploaded") == "uploaded":
+                cia_assets.append(a)
+    cia_assets = cia_assets[:MAX_QR_BUTTONS]
+    buttons = []
+    for a in cia_assets:
+        qr_url = ("https://api.qrserver.com/v1/create-qr-code/?size=500x500&margin=12&data="
+                  + quote(a["browser_download_url"], safe=""))
+        if len(cia_assets) == 1:
+            label = "📱 Згенерувати QR (3dsDL, FBI)"
+        else:
+            name = a["name"] if len(a["name"]) <= 32 else a["name"][:29] + "..."
+            label = f"📱 QR: {name}"
+        buttons.append({"text": label, "url": qr_url})
+    return buttons
+
+
+def send(text, buttons=None):
     if not (TG_TOKEN and TG_CHAT):
         print(text)
+        if buttons:
+            print("Buttons:", buttons)
         return
     # TELEGRAM_CHAT_ID can hold several IDs separated by commas, e.g. 12345,67890
     for chat_id in [c.strip() for c in TG_CHAT.split(",") if c.strip()]:
-        r = requests.post(
-            f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-            json={"chat_id": chat_id, "text": text[:4000], "parse_mode": "HTML",
-                  "disable_web_page_preview": True},
-            timeout=30,
-        )
+        payload = {"chat_id": chat_id, "text": text[:4000], "parse_mode": "HTML",
+                   "disable_web_page_preview": True}
+        if buttons:
+            payload["reply_markup"] = {"inline_keyboard": [[b] for b in buttons]}  # one button per row
+        r = requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                          json=payload, timeout=30)
         if not r.ok:
             print(f"Telegram error for {chat_id}:", r.text)
 
@@ -264,7 +292,7 @@ def main():
             if len(new_releases) > 10:
                 lines.append(f"…і ще {len(new_releases) - 10}")
         lines.append(f"\n{item['html_url']}")
-        send("\n".join(lines))
+        send("\n".join(lines), make_qr_buttons(new_releases))
         notified += 1
 
     state["last_run"] = iso(now)
