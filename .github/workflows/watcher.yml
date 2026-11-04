@@ -2,7 +2,7 @@ name: 3DS repo watcher
 
 on:
   schedule:
-    - cron: "0 */3 * * *"   # every 3 hours
+    - cron: "0 */6 * * *"   # every 6 hours
   workflow_dispatch:         # lets you start it manually with a button
 
 permissions:
@@ -33,8 +33,8 @@ jobs:
 
       - name: Save state
         run: |
-          git config user.name "watcher-bot"
-          git config user.email "watcher-bot@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add state.json
           if git diff --staged --quiet; then
             echo "Nothing to save"
