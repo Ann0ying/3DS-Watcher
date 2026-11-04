@@ -19,3 +19,4 @@ sobrangatinaCpu/ciTrack
 sashkinbro/EmuCoreD
 kirka-11/3dmoo-Full-Version
 fakeneui1802-ops/Lunary
+LopezTutoriales/Luma3DS-Spanish
