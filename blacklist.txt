@@ -33,3 +33,4 @@ nirajkandel02-oss/citra-menu
 David-Darras/sango-plugin
 arturofuentes1988/EmuSuNi
 5826407-op/hub-3ds-a
+3ds-engine/ruggie-lib
