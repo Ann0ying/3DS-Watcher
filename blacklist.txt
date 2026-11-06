@@ -23,3 +23,13 @@ LopezTutoriales/Luma3DS-Spanish
 cammonkitty-34/3dmoo
 openpak/nex
 nathsou/3dsrecomp
+ShiromiyaG/Bergamota
+Invictus-potens/smt4-recomp
+Manggome/OneEmu
+exultantliving0/Nintendall-Project
+AlgebraManiacABC/3dsd
+Zinogre247-crypto/citra-mmj
+nirajkandel02-oss/citra-menu
+David-Darras/sango-plugin
+arturofuentes1988/EmuSuNi
+5826407-op/hub-3ds-a
