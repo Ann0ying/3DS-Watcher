@@ -34,3 +34,10 @@ David-Darras/sango-plugin
 arturofuentes1988/EmuSuNi
 5826407-op/hub-3ds-a
 3ds-engine/ruggie-lib
+ObjFW/ObjFW
+fearkov/zakuro
+azahar-emu/azahar
+mikrobotboot-ship-it/QUANTUM-3DS
+RegiRex/DroiDDS
+Zinogre247-crypto/Citra-mmj-optimizado
+beiklive/GBAStation_melonDS
